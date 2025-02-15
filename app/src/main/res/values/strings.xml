@@ -1,0 +1,11 @@
+<resources>
+    <string name="app_name">Wave</string>
+    <string name="welcome_title">Welcome to Wave</string>
+    <string name="welcome_description">Connect with your classmates, share updates, and chat in real-time</string>
+    <string name="get_started">Get Started</string>
+    <string name="chats">chats\n</string>
+    <string name="search_chats">search</string>
+    <string name="no_chats_yet">NO chat yet</string>
+    <string name="start_new_chat">newchat</string>
+    <string name="new_chat">chat</string>
+</resources>

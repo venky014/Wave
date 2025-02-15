@@ -1,0 +1,30 @@
+{
+  "project_info": {
+    "project_number": "178336934637",
+    "firebase_url": "https://chatty-3a390-default-rtdb.firebaseio.com",
+    "project_id": "chatty-3a390",
+    "storage_bucket": "chatty-3a390.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:178336934637:android:3c029a91870cb432f8fae4",
+        "android_client_info": {
+          "package_name": "com.project.wave"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAF6ahP1Ei4RuLIrhpY3IHuMSNAcPUgCnY"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
