@@ -22,7 +22,9 @@
         tools:layout="@layout/fragment_sign_in">
         <action
             android:id="@+id/action_to_home"
-            app:destination="@id/mainFragment"/>
+            app:destination="@id/mainFragment"
+            app:popUpTo="@id/nav_graph"
+            app:popUpToInclusive="true"/>
         <action
             android:id="@+id/action_to_signUp"
             app:destination="@id/signUpFragment" />
@@ -31,20 +33,16 @@
     <fragment
         android:id="@+id/signUpFragment"
         android:name="com.project.wave.ui.SignUpFragment"
-        android:label="SignUpFragment"
-        tools:layout="@layout/fragment_sign_up">
+        android:label="SignUpFragment">
         <action
-            android:id="@+id/action_to_main"
-            app:destination="@id/mainFragment"
-            app:popUpTo="@id/nav_graph"
-            app:popUpToInclusive="true" />
+            android:id="@+id/action_to_signIn"
+            app:destination="@id/signInFragment" />
     </fragment>
 
     <fragment
         android:id="@+id/mainFragment"
         android:name="com.project.wave.ui.HomeFragment"
-        android:label="HomeFragment"
-        tools:layout="@layout/fragment_home">
+        android:label="Home">
         <action
             android:id="@+id/action_to_profile"
             app:destination="@id/profileFragment" />
@@ -56,7 +54,8 @@
     <fragment
         android:id="@+id/profileFragment"
         android:name="com.project.wave.ui.ProfileFragment"
-        android:label="Profile">
+        android:label="Profile"
+        tools:layout="@layout/fragment_profile">
         <action
             android:id="@+id/action_to_getStarted"
             app:destination="@id/getStartedFragment"

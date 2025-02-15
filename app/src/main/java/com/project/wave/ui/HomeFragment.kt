@@ -1,9 +1,11 @@
 package com.project.wave.ui
 
 import android.os.Bundle
+import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.widget.Toast
 import androidx.fragment.app.Fragment
 import androidx.navigation.fragment.findNavController
 import androidx.viewpager2.adapter.FragmentStateAdapter
@@ -51,7 +53,26 @@ class HomeFragment : Fragment() {
 
     private fun setupClickListeners() {
         binding.profileAvatar.setOnClickListener {
-            findNavController().navigate(R.id.action_to_profile)
+            try {
+                Log.d("HomeFragment", "Profile avatar clicked")
+                val currentDestId = findNavController().currentDestination?.id
+                Log.d("HomeFragment", "Current destination ID: $currentDestId")
+                
+                if (currentDestId == R.id.mainFragment) {
+                    findNavController().navigate(R.id.action_to_profile)
+                    Log.d("HomeFragment", "Navigation successful")
+                } else {
+                    Log.e("HomeFragment", "Invalid current destination for profile navigation")
+                    Toast.makeText(context, "Navigation error: Invalid destination", Toast.LENGTH_SHORT).show()
+                }
+            } catch (e: Exception) {
+                Log.e("HomeFragment", "Navigation failed", e)
+                Toast.makeText(
+                    context,
+                    "Navigation error: ${e.message}. Please try again.",
+                    Toast.LENGTH_SHORT
+                ).show()
+            }
         }
 
         binding.searchFab.setOnClickListener {

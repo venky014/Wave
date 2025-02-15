@@ -32,6 +32,10 @@ class SignUpFragment : Fragment() {
         auth = FirebaseAuth.getInstance()
         db = FirebaseFirestore.getInstance()
 
+        setupSignUpButton()
+    }
+
+    private fun setupSignUpButton() {
         binding.signUpButton.setOnClickListener {
             val email = binding.emailEditText.text.toString()
             val password = binding.passwordEditText.text.toString()
@@ -39,22 +43,37 @@ class SignUpFragment : Fragment() {
             val rollNumber = binding.rollNumberEditText.text.toString()
 
             if (validateInputs(email, password, confirmPassword, rollNumber)) {
+                // Show loading state
+                binding.signUpButton.isEnabled = false
+                binding.progressBar.visibility = View.VISIBLE
+
                 auth.createUserWithEmailAndPassword(email, password)
                     .addOnCompleteListener { task ->
                         if (task.isSuccessful) {
                             // Save additional user data to Firestore
                             val user = hashMapOf(
                                 "email" to email,
-                                "rollNumber" to rollNumber
+                                "rollNumber" to rollNumber,
+                                "avatarId" to 1
                             )
                             
                             db.collection("users")
                                 .document(auth.currentUser!!.uid)
                                 .set(user)
                                 .addOnSuccessListener {
-                                    findNavController().navigate(R.id.action_to_home)
+                                    // Delay for 3 seconds before showing success and navigating
+                                    binding.root.postDelayed({
+                                        Toast.makeText(
+                                            context,
+                                            "Sign up successful!",
+                                            Toast.LENGTH_SHORT
+                                        ).show()
+                                        findNavController().navigate(R.id.action_to_signIn)
+                                    }, 3000)
                                 }
                                 .addOnFailureListener { e ->
+                                    binding.signUpButton.isEnabled = true
+                                    binding.progressBar.visibility = View.GONE
                                     Toast.makeText(
                                         context,
                                         "Failed to save user data: ${e.message}",
@@ -62,6 +81,8 @@ class SignUpFragment : Fragment() {
                                     ).show()
                                 }
                         } else {
+                            binding.signUpButton.isEnabled = true
+                            binding.progressBar.visibility = View.GONE
                             Toast.makeText(
                                 context,
                                 "Sign up failed: ${task.exception?.message}",

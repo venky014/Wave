@@ -3,6 +3,7 @@ package com.project.wave
 import android.os.Bundle
 import androidx.appcompat.app.AppCompatActivity
 import androidx.navigation.NavController
+import androidx.navigation.NavOptions
 import androidx.navigation.fragment.NavHostFragment
 import com.google.firebase.auth.FirebaseAuth
 import com.project.wave.databinding.ActivityMainBinding
@@ -25,9 +26,22 @@ class MainActivity : AppCompatActivity() {
 
         // Check if user is already signed in
         auth.currentUser?.let {
-            navController.navigate(R.id.mainFragment)
+            // Navigate to main fragment with proper navigation options
+            navController.navigate(R.id.mainFragment, null, 
+                NavOptions.Builder()
+                    .setPopUpTo(R.id.nav_graph, true)
+                    .build()
+            )
+        }
+    }
 
-
+    override fun onBackPressed() {
+        val currentDestination = navController.currentDestination?.id
+        if (currentDestination == R.id.mainFragment) {
+            // If we're on the main fragment, minimize the app instead of navigating back
+            moveTaskToBack(true)
+        } else {
+            super.onBackPressed()
         }
     }
 
