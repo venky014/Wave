@@ -42,13 +42,17 @@
     <fragment
         android:id="@+id/mainFragment"
         android:name="com.project.wave.ui.HomeFragment"
-        android:label="Home">
+        android:label="Home"
+        tools:layout="@layout/fragment_home">
         <action
             android:id="@+id/action_to_profile"
             app:destination="@id/profileFragment" />
         <action
             android:id="@+id/action_to_search"
             app:destination="@id/searchFragment" />
+        <action
+            android:id="@+id/action_to_chat"
+            app:destination="@id/chatFragment" />
     </fragment>
 
     <fragment

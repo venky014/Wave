@@ -3,17 +3,23 @@ package com.project.wave.ui
 import android.os.Bundle
 import android.util.Log
 import android.view.LayoutInflater
+import android.view.Menu
+import android.view.MenuInflater
+import android.view.MenuItem
 import android.view.View
 import android.view.ViewGroup
 import android.widget.Toast
+import androidx.core.os.bundleOf
 import androidx.fragment.app.Fragment
 import androidx.navigation.fragment.findNavController
 import androidx.viewpager2.adapter.FragmentStateAdapter
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.android.material.tabs.TabLayoutMediator
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.project.wave.R
 import com.project.wave.databinding.FragmentHomeBinding
+import com.project.wave.model.User
 
 class HomeFragment : Fragment() {
     private var _binding: FragmentHomeBinding? = null
@@ -45,7 +51,7 @@ class HomeFragment : Fragment() {
         TabLayoutMediator(binding.tabLayout, binding.viewPager) { tab, position ->
             tab.text = when (position) {
                 0 -> "Chats"
-                1 -> "Updates"
+                1 -> "Users"
                 else -> null
             }
         }.attach()
@@ -73,10 +79,6 @@ class HomeFragment : Fragment() {
                     Toast.LENGTH_SHORT
                 ).show()
             }
-        }
-
-        binding.searchFab.setOnClickListener {
-            findNavController().navigate(R.id.action_to_search)
         }
     }
 
@@ -107,9 +109,9 @@ class HomeFragment : Fragment() {
         override fun createFragment(position: Int): Fragment {
             return when (position) {
                 0 -> ChatListFragment()
-                1 -> UpdatesFragment()
+                1 -> UsersFragment()
                 else -> throw IllegalStateException("Invalid position $position")
             }
         }
     }
-} 
+}
