@@ -48,11 +48,28 @@
             android:id="@+id/action_to_profile"
             app:destination="@id/profileFragment" />
         <action
-            android:id="@+id/action_to_search"
-            app:destination="@id/searchFragment" />
-        <action
             android:id="@+id/action_to_chat"
-            app:destination="@id/chatFragment" />
+            app:destination="@id/chatFragment">
+            <argument
+                android:name="userId"
+                app:argType="string" />
+            <argument
+                android:name="userEmail"
+                app:argType="string" />
+            <argument
+                android:name="userRollNumber"
+                app:argType="string" />
+            <argument
+                android:name="userAvatarId"
+                app:argType="integer" />
+        </action>
+        <action
+            android:id="@+id/action_to_search"
+            app:destination="@id/searchFragment"
+            app:enterAnim="@anim/slide_in_right"
+            app:exitAnim="@anim/slide_out_left"
+            app:popEnterAnim="@anim/slide_in_left"
+            app:popExitAnim="@anim/slide_out_right" />
     </fragment>
 
     <fragment

@@ -9,4 +9,5 @@
     <string name="start_new_chat">newchat</string>
     <string name="new_chat">chat</string>
     <string name="search_users">Search users by roll number or email</string>
+    <string name="search_placeholder">Search chats</string>
 </resources>

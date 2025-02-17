@@ -6,6 +6,7 @@ import android.view.ViewGroup
 import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
+import com.project.wave.R
 import com.project.wave.databinding.ItemMessageReceivedBinding
 import com.project.wave.databinding.ItemMessageSentBinding
 import com.project.wave.model.Message
@@ -67,15 +68,25 @@ class ChatAdapter(
         private val binding: ItemMessageSentBinding
     ) : RecyclerView.ViewHolder(binding.root) {
         fun bind(message: Message) {
-            binding.messageText.text = message.text
-            binding.timestampText.text = formatTimestamp(message.timestamp)
-            
-            if (message.type == MessageType.FILE && message.fileUrl != null) {
-                binding.fileContainer.visibility = View.VISIBLE
-                binding.fileName.text = message.fileName
-            } else {
-                binding.fileContainer.visibility = View.GONE
+            when (message.type) {
+                MessageType.FILE -> {
+                    binding.messageText.text = message.text
+                    binding.messageText.setOnClickListener {
+                        message.fileUrl?.let { url ->
+                            onFileClick(url)
+                        }
+                    }
+                    binding.messageText.setCompoundDrawablesWithIntrinsicBounds(
+                        R.drawable.ic_attach_file, 0, 0, 0
+                    )
+                }
+                MessageType.TEXT -> {
+                    binding.messageText.text = message.text
+                    binding.messageText.setOnClickListener(null)
+                    binding.messageText.setCompoundDrawablesWithIntrinsicBounds(0, 0, 0, 0)
+                }
             }
+            binding.messageTimestamp.text = formatTime(message.timestamp)
         }
     }
 
@@ -83,30 +94,38 @@ class ChatAdapter(
         private val binding: ItemMessageReceivedBinding
     ) : RecyclerView.ViewHolder(binding.root) {
         fun bind(message: Message) {
-            binding.messageText.text = message.text
-            binding.timestampText.text = formatTimestamp(message.timestamp)
-            
-            if (message.type == MessageType.FILE && message.fileUrl != null) {
-                binding.fileContainer.visibility = View.VISIBLE
-                binding.fileName.text = message.fileName
-            } else {
-                binding.fileContainer.visibility = View.GONE
+            when (message.type) {
+                MessageType.FILE -> {
+                    binding.messageText.text = message.text
+                    binding.messageText.setOnClickListener {
+                        message.fileUrl?.let { url ->
+                            onFileClick(url)
+                        }
+                    }
+                    binding.messageText.setCompoundDrawablesWithIntrinsicBounds(
+                        R.drawable.ic_attach_file, 0, 0, 0
+                    )
+                }
+                MessageType.TEXT -> {
+                    binding.messageText.text = message.text
+                    binding.messageText.setOnClickListener(null)
+                    binding.messageText.setCompoundDrawablesWithIntrinsicBounds(0, 0, 0, 0)
+                }
             }
+            binding.messageTimestamp.text = formatTime(message.timestamp)
         }
     }
 
-    private fun formatTimestamp(timestamp: Long): String {
+    private fun formatTime(timestamp: Long): String {
         val sdf = SimpleDateFormat("HH:mm", Locale.getDefault())
         return sdf.format(Date(timestamp))
     }
-}
 
-class MessageDiffCallback : DiffUtil.ItemCallback<Message>() {
-    override fun areItemsTheSame(oldItem: Message, newItem: Message): Boolean {
-        return oldItem.id == newItem.id
-    }
+    private class MessageDiffCallback : DiffUtil.ItemCallback<Message>() {
+        override fun areItemsTheSame(oldItem: Message, newItem: Message) =
+            oldItem.id == newItem.id
 
-    override fun areContentsTheSame(oldItem: Message, newItem: Message): Boolean {
-        return oldItem == newItem
+        override fun areContentsTheSame(oldItem: Message, newItem: Message) =
+            oldItem == newItem
     }
 } 

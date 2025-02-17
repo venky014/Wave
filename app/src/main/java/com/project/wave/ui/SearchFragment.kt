@@ -1,6 +1,7 @@
 package com.project.wave.ui
 
 import android.os.Bundle
+import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -13,16 +14,16 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.project.wave.R
-import com.project.wave.databinding.FragmentUsersBinding
+import com.project.wave.databinding.FragmentSearchBinding
 import com.project.wave.model.User
-import com.project.wave.ui.adapter.SearchAdapter
+import com.project.wave.ui.adapter.UserAdapter
 
 class SearchFragment : Fragment() {
-    private var _binding: FragmentUsersBinding? = null
+    private var _binding: FragmentSearchBinding? = null
     private val binding get() = _binding!!
     private lateinit var auth: FirebaseAuth
     private lateinit var db: FirebaseFirestore
-    private lateinit var userAdapter: SearchAdapter
+    private lateinit var userAdapter: UserAdapter
     private var allUsers = listOf<User>()
 
     override fun onCreateView(
@@ -30,7 +31,7 @@ class SearchFragment : Fragment() {
         container: ViewGroup?,
         savedInstanceState: Bundle?
     ): View {
-        _binding = FragmentUsersBinding.inflate(inflater, container, false)
+        _binding = FragmentSearchBinding.inflate(inflater, container, false)
         return binding.root
     }
 
@@ -39,13 +40,20 @@ class SearchFragment : Fragment() {
         auth = FirebaseAuth.getInstance()
         db = FirebaseFirestore.getInstance()
 
+        setupToolbar()
         setupRecyclerView()
         setupSearch()
         loadUsers()
     }
 
+    private fun setupToolbar() {
+        binding.toolbar.setNavigationOnClickListener {
+            findNavController().navigateUp()
+        }
+    }
+
     private fun setupRecyclerView() {
-        userAdapter = SearchAdapter { user ->
+        userAdapter = UserAdapter { user ->
             val action = SearchFragmentDirections.actionToChat(
                 userId = user.id,
                 userEmail = user.email,
@@ -54,8 +62,8 @@ class SearchFragment : Fragment() {
             )
             findNavController().navigate(action)
         }
-        
-        binding.usersList.apply {
+
+        binding.searchResults.apply {
             layoutManager = LinearLayoutManager(requireContext())
             adapter = userAdapter
             addItemDecoration(DividerItemDecoration(context, DividerItemDecoration.VERTICAL))
@@ -63,6 +71,8 @@ class SearchFragment : Fragment() {
     }
 
     private fun setupSearch() {
+        binding.searchInput.requestFocus()
+        
         binding.searchInput.addTextChangedListener { text ->
             filterUsers(text?.toString() ?: "")
         }
@@ -71,49 +81,69 @@ class SearchFragment : Fragment() {
     private fun loadUsers() {
         val currentUserId = auth.currentUser?.uid ?: return
         
+        binding.progressBar.visibility = View.VISIBLE
+        
         db.collection("users")
             .get()
             .addOnSuccessListener { documents ->
-                // Filter out current user and map to User objects
-                allUsers = documents.mapNotNull { doc ->
-                    // Only create User object if it's not the current user
-                    if (doc.id != currentUserId) {
-                        User(
-                            id = doc.id,
-                            email = doc.getString("email") ?: "",
-                            rollNumber = doc.getString("rollNumber") ?: "",
-                            avatarId = doc.getLong("avatarId")?.toInt() ?: 1
-                        )
-                    } else null
-                }.sortedBy { it.rollNumber } // Sort by roll number
+                allUsers = documents
+                    .mapNotNull { doc ->
+                        // Skip current user's document
+                        if (doc.id == currentUserId) {
+                            null
+                        } else {
+                            try {
+                                User(
+                                    id = doc.id,  // Use document ID instead of field
+                                    email = doc.getString("email") ?: "",
+                                    rollNumber = doc.getString("rollNumber") ?: "",
+                                    avatarId = doc.getLong("avatarId")?.toInt() ?: 1
+                                )
+                            } catch (e: Exception) {
+                                Log.e("SearchFragment", "Error mapping user: ${e.message}")
+                                null
+                            }
+                        }
+                    }
+                    .sortedBy { it.rollNumber }
                 
                 userAdapter.submitList(allUsers)
                 updateVisibility()
             }
             .addOnFailureListener { e ->
-                Toast.makeText(
-                    context, 
-                    "Error loading users: ${e.message}", 
-                    Toast.LENGTH_SHORT
-                ).show()
+                Toast.makeText(context, "Error loading users: ${e.message}", Toast.LENGTH_SHORT).show()
+                binding.progressBar.visibility = View.GONE
             }
     }
 
     private fun filterUsers(query: String) {
-        val filteredUsers = if (query.isEmpty()) {
-            allUsers
-        } else {
-            allUsers.filter { user ->
-                user.rollNumber.lowercase().contains(query.lowercase()) ||
-                user.email.lowercase().contains(query.lowercase())
-            }
+        if (query.isEmpty()) {
+            userAdapter.submitList(allUsers)
+            updateVisibility()
+            return
         }
+
+        val filteredUsers = allUsers.filter { user ->
+            user.rollNumber.lowercase().contains(query.lowercase()) ||
+            user.email.lowercase().contains(query.lowercase())
+        }.sortedBy { it.rollNumber }
+        
         userAdapter.submitList(filteredUsers)
         updateVisibility()
     }
 
     private fun updateVisibility() {
-        binding.usersList.visibility = if (allUsers.isEmpty()) View.GONE else View.VISIBLE
+        binding.apply {
+            if (allUsers.isEmpty()) {
+                searchResults.visibility = View.GONE
+                noResultsText.visibility = View.VISIBLE
+                progressBar.visibility = View.GONE
+            } else {
+                searchResults.visibility = View.VISIBLE
+                noResultsText.visibility = View.GONE
+                progressBar.visibility = View.GONE
+            }
+        }
     }
 
     override fun onDestroyView() {

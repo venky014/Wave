@@ -14,11 +14,9 @@ service cloud.firestore {
         (request.auth.uid == participants[0] || request.auth.uid == participants[1]);
     }
     
-    // Helper function to check if message is allowed
-    function isMessageAllowed(chatId) {
-      let chat = get(/databases/$(database)/documents/chats/$(chatId)).data;
-      return chat.status == 'accepted' || 
-             (chat.status == 'pending' && chat.senderId == request.auth.uid);
+    function isFirstMessage(chatId) {
+      let existingMessages = getAfter(/databases/$(database)/documents/chats/$(chatId)).data.messages;
+      return existingMessages == null || existingMessages.size() == 0;
     }
     
     // Chat documents
@@ -28,8 +26,8 @@ service cloud.firestore {
         request.resource.data.senderId == request.auth.uid &&
         request.resource.data.status == 'pending';
       allow update: if isAuthenticated() && 
-        (resource.data.receiverId == request.auth.uid) &&
-        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status']);
+        (resource.data.receiverId == request.auth.uid ||
+         resource.data.senderId == request.auth.uid);
       allow delete: if false;
     }
     
@@ -38,7 +36,11 @@ service cloud.firestore {
       allow read: if isInvolvedInChat(chatId);
       allow create: if isAuthenticated() && 
         request.resource.data.senderId == request.auth.uid &&
-        isMessageAllowed(chatId);
+        (
+          isFirstMessage(chatId) ? 
+            request.resource.data.message == "Hi" : 
+            true
+        );
       allow update, delete: if false;
     }
     
