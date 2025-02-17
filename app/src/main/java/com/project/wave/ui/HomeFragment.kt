@@ -84,16 +84,19 @@ class HomeFragment : Fragment() {
     }
 
     private fun setupChatList() {
-        chatAdapter = ChatListAdapter { chatItem ->
-            val action = HomeFragmentDirections.actionToChat(
-                userId = if (chatItem.senderId == auth.currentUser?.uid) 
-                    chatItem.receiverId else chatItem.senderId,
-                userRollNumber = chatItem.otherUserRollNumber ?: "",
-                userAvatarId = chatItem.otherUserAvatarId,
-                userEmail = ""
-            )
-            findNavController().navigate(action)
-        }
+        chatAdapter = ChatListAdapter(
+            currentUserId = auth.currentUser?.uid,
+            onChatClick = { chatItem ->
+                val action = HomeFragmentDirections.actionToChat(
+                    userId = if (chatItem.senderId == auth.currentUser?.uid) 
+                        chatItem.receiverId else chatItem.senderId,
+                    userRollNumber = chatItem.otherUserRollNumber ?: "",
+                    userAvatarId = chatItem.otherUserAvatarId,
+                    userEmail = ""
+                )
+                findNavController().navigate(action)
+            }
+        )
 
         binding.chatList.apply {
             layoutManager = LinearLayoutManager(requireContext())
@@ -109,6 +112,7 @@ class HomeFragment : Fragment() {
         
         db.collection("chats")
             .whereArrayContains("participants", currentUserId)
+            .orderBy("timestamp", Query.Direction.DESCENDING)
             .addSnapshotListener { snapshots, e ->
                 if (e != null) {
                     Log.e("HomeFragment", "Error loading chats", e)
@@ -121,42 +125,52 @@ class HomeFragment : Fragment() {
                 }
 
                 val chatItems = mutableListOf<ChatItem>()
+                val totalChats = snapshots?.documents?.size ?: 0
+                var processedChats = 0
                 
                 snapshots?.documents?.forEach { doc ->
                     try {
                         val otherUserId = (doc.get("participants") as? List<String>)?.find { it != currentUserId }
                         
                         if (otherUserId != null) {
-                            // Create ChatItem with basic info first
-                            val chatItem = ChatItem(
-                                id = doc.id,
-                                lastMessage = doc.getString("lastMessage") ?: "",
-                                timestamp = doc.getLong("timestamp") ?: 0,
-                                participants = doc.get("participants") as? List<String> ?: listOf(),
-                                status = doc.getString("status") ?: "pending",
-                                senderId = doc.getString("senderId") ?: "",
-                                receiverId = doc.getString("receiverId") ?: ""
-                            )
-                            
-                            // Get other user's details
-                            db.collection("users")
-                                .document(otherUserId)
+                            db.collection("chats")
+                                .document(doc.id)
+                                .collection("messages")
+                                .orderBy("timestamp", Query.Direction.DESCENDING)
+                                .limit(1)
                                 .get()
-                                .addOnSuccessListener { userDoc ->
-                                    val updatedChatItem = chatItem.copy(
-                                        otherUserRollNumber = userDoc.getString("rollNumber"),
-                                        otherUserAvatarId = userDoc.getLong("avatarId")?.toInt() ?: 1
-                                    )
-                                    chatItems.add(updatedChatItem)
+                                .addOnSuccessListener { messageSnapshot ->
+                                    val lastMessage = messageSnapshot.documents.firstOrNull()
                                     
-                                    // Update the list
-                                    val sortedItems = chatItems.sortedByDescending { it.timestamp }
-                                    chatAdapter.submitList(sortedItems)
-                                    updateVisibility(sortedItems)
+                                    db.collection("users")
+                                        .document(otherUserId)
+                                        .get()
+                                        .addOnSuccessListener { userDoc ->
+                                            val chatItem = ChatItem(
+                                                id = doc.id,
+                                                lastMessage = lastMessage?.getString("text") ?: "",
+                                                timestamp = lastMessage?.getLong("timestamp") ?: 0,
+                                                participants = doc.get("participants") as? List<String> ?: listOf(),
+                                                status = doc.getString("status") ?: "pending",
+                                                senderId = lastMessage?.getString("senderId") ?: "",
+                                                receiverId = doc.getString("receiverId") ?: "",
+                                                otherUserRollNumber = userDoc.getString("rollNumber"),
+                                                otherUserAvatarId = userDoc.getLong("avatarId")?.toInt() ?: 1
+                                            )
+                                            chatItems.add(chatItem)
+                                            
+                                            processedChats++
+                                            if (processedChats == totalChats) {
+                                                val sortedItems = chatItems.sortedByDescending { it.timestamp }
+                                                chatAdapter.submitList(sortedItems)
+                                                updateVisibility(sortedItems)
+                                            }
+                                        }
                                 }
                         }
                     } catch (e: Exception) {
                         Log.e("HomeFragment", "Error mapping chat", e)
+                        processedChats++
                     }
                 }
             }

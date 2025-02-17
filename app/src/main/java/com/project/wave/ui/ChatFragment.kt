@@ -35,6 +35,7 @@ import com.project.wave.model.User
 import com.project.wave.ui.adapter.ChatAdapter
 import java.util.UUID
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
+import com.google.firebase.firestore.ListenerRegistration
 
 class ChatFragment : Fragment() {
     private var _binding: FragmentChatBinding? = null
@@ -42,6 +43,7 @@ class ChatFragment : Fragment() {
     private lateinit var auth: FirebaseAuth
     private lateinit var db: FirebaseFirestore
     private lateinit var adapter: ChatAdapter
+    private var messageListener: ListenerRegistration? = null
     private var messages = mutableListOf<Message>()
     private val currentUserId get() = auth.currentUser?.uid
     private val chatId get() = getChatId(currentUserId ?: "", args.userId)
@@ -103,31 +105,37 @@ class ChatFragment : Fragment() {
                         toolbar.title = rollNumber.ifEmpty { "User" }
                         
                         // Set user avatar in toolbar
-                        val avatarResId = resources.getIdentifier(
+            val avatarResId = resources.getIdentifier(
                             "avatar_$avatarId",
-                            "drawable",
-                            requireContext().packageName
-                        )
-                        userAvatar.setImageResource(avatarResId)
-                        
-                        // Setup back button
+                "drawable",
+                requireContext().packageName
+            )
+            userAvatar.setImageResource(avatarResId)
+            
+            // Setup back button
                         toolbar.setNavigationOnClickListener {
-                            findNavController().navigateUp()
-                        }
-                    }
+                findNavController().navigateUp()
+            }
+        }
                 }
             }
             .addOnFailureListener { e ->
                 Log.e("ChatFragment", "Error loading user details", e)
                 binding.toolbar.title = "User"
-            }
+        }
     }
 
     private fun setupMessageInput() {
+        // Initially disable message input for receiver until accepted
+        if (currentUserId != args.userId) {
+            binding.messageInput.isEnabled = false
+            binding.sendButton.isEnabled = false
+        }
+
         binding.sendButton.setOnClickListener {
             val message = binding.messageInput.text.toString().trim()
             
-            if (messages.isEmpty()) {
+            if (messages.isEmpty() && currentUserId == args.userId) {
                 if (message.equals("Hi", ignoreCase = true)) {
                     sendFirstMessage(message)
                 } else {
@@ -137,33 +145,60 @@ class ChatFragment : Fragment() {
                 checkAndSendMessage(message)
             }
         }
+
+        // Check chat status on start
+        checkChatStatus()
     }
 
-    private fun checkAndSendMessage(message: String) {
-        if (currentUserId == null) return
-
+    private fun checkChatStatus() {
         db.collection("chats")
             .document(chatId)
             .get()
             .addOnSuccessListener { document ->
                 val status = document.getString("status") ?: "pending"
-                val senderId = document.getString("senderId")
+                val isAccepted = document.getBoolean("isAccepted") ?: false
 
-                when {
-                    // Sender can only send "Hi" when status is pending
-                    status == "pending" && currentUserId == senderId -> {
-                        showWaitForAcceptanceDialog()
-                    }
-                    // Anyone can send messages when status is accepted
-                    status == "accepted" -> {
-                        sendMessage(message)
-                    }
-                    // No messages allowed when blocked
-                    status == "blocked" -> {
-                        Toast.makeText(context, "This chat is blocked", Toast.LENGTH_SHORT).show()
-                    }
+                if (status == "accepted" || isAccepted) {
+                    binding.messageInput.isEnabled = true
+                    binding.sendButton.isEnabled = true
+                    isAllowed = true
                 }
             }
+    }
+
+    private fun checkAndSendMessage(message: String) {
+        if (currentUserId == null) return
+
+        if (isAllowed) {
+            sendMessage(message)
+        } else {
+            db.collection("chats")
+                .document(chatId)
+                .get()
+                .addOnSuccessListener { document ->
+                    val status = document.getString("status") ?: "pending"
+                    val senderId = document.getString("senderId")
+                    val isAccepted = document.getBoolean("isAccepted") ?: false
+
+                    when {
+                        // Sender can only send "Hi" when status is pending
+                        status == "pending" && currentUserId == senderId -> {
+                            showWaitForAcceptanceDialog()
+                        }
+                        // Anyone can send messages when status is accepted
+                        status == "accepted" || isAccepted -> {
+                            sendMessage(message)
+                            isAllowed = true
+                            binding.messageInput.isEnabled = true
+                            binding.sendButton.isEnabled = true
+                        }
+                        // No messages allowed when blocked
+                        status == "blocked" -> {
+                            Toast.makeText(context, "This chat is blocked", Toast.LENGTH_SHORT).show()
+                        }
+                    }
+                }
+        }
     }
 
     private fun showWaitForAcceptanceDialog() {
@@ -223,7 +258,7 @@ class ChatFragment : Fragment() {
             "text" to message,
             "timestamp" to System.currentTimeMillis(),
             "type" to MessageType.TEXT.name,
-            "read" to false
+            "isFirstMessage" to isFirstMessage
         )
 
         db.collection("chats")
@@ -233,6 +268,7 @@ class ChatFragment : Fragment() {
             .addOnSuccessListener {
                 binding.messageInput.text.clear()
                 updateLastMessage(chatId, message)
+                if (isFirstMessage) isFirstMessage = false
             }
             .addOnFailureListener { e ->
                 Toast.makeText(context, "Error sending message: ${e.message}", Toast.LENGTH_SHORT).show()
@@ -255,27 +291,20 @@ class ChatFragment : Fragment() {
         otherUserId?.let { recipientId ->
             val chatId = getChatId(currentUserId, recipientId)
             
-            db.collection("chats")
-                .document(chatId)
-                .get()
-                .addOnSuccessListener { document ->
-                    val senderId = document.getString("senderId")
-                    val status = document.getString("status") ?: "pending"
-                    
-                    if (currentUserId != senderId && status == "pending") {
-                        showAcceptanceDialog()
-                    }
-                }
-
-            db.collection("chats")
+            // Remove previous listener if exists
+            messageListener?.remove()
+            
+            messageListener = db.collection("chats")
                 .document(chatId)
                 .collection("messages")
                 .orderBy("timestamp", Query.Direction.ASCENDING)
                 .addSnapshotListener { snapshot, error ->
                     if (error != null) {
-                        Toast.makeText(context, "Error loading messages", Toast.LENGTH_SHORT).show()
+                        Log.e("ChatFragment", "Error loading messages", error)
                         return@addSnapshotListener
                     }
+
+                    if (_binding == null) return@addSnapshotListener
 
                     val messages = snapshot?.documents?.mapNotNull { doc ->
                         try {
@@ -294,9 +323,7 @@ class ChatFragment : Fragment() {
                         }
                     } ?: emptyList()
 
-                    this.messages = messages.toMutableList()
                     adapter.submitList(messages)
-                    
                     if (messages.isNotEmpty()) {
                         binding.messagesRecyclerView.scrollToPosition(messages.size - 1)
                     }
@@ -328,6 +355,7 @@ class ChatFragment : Fragment() {
 
     override fun onDestroyView() {
         super.onDestroyView()
+        messageListener?.remove() // Clean up listener
         _binding = null
     }
 
@@ -409,14 +437,15 @@ class ChatFragment : Fragment() {
             "message" to fileName,
             "fileUrl" to fileUrl,
             "timestamp" to System.currentTimeMillis(),
-            "type" to MessageType.FILE.name
+            "type" to MessageType.FILE.name,
+            "read" to false
         )
 
-                    db.collection("chats")
-                        .document(chatId)
-                        .collection("messages")
+        db.collection("chats")
+            .document(chatId)
+            .collection("messages")
             .add(messageData)
-                        .addOnSuccessListener {
+            .addOnSuccessListener {
                 updateLastMessage(chatId, "Sent a file: $fileName")
             }
             .addOnFailureListener { e ->
@@ -444,9 +473,19 @@ class ChatFragment : Fragment() {
         
         db.collection("chats")
             .document(chatId)
-            .update("status", newStatus)
+            .update(
+                mapOf(
+                    "status" to newStatus,
+                    "isAccepted" to accepted  // Add this field
+                )
+            )
             .addOnSuccessListener {
-                if (!accepted) {
+                if (accepted) {
+                    // Enable message input after acceptance
+                    binding.messageInput.isEnabled = true
+                    binding.sendButton.isEnabled = true
+                    isAllowed = true  // Set permission flag
+                } else {
                     findNavController().navigateUp()
                 }
             }
