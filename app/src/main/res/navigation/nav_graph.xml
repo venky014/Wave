@@ -70,10 +70,10 @@
     <fragment
         android:id="@+id/searchFragment"
         android:name="com.project.wave.ui.SearchFragment"
-        android:label="SearchFragment"
+        android:label="Search Users"
         tools:layout="@layout/fragment_search">
         <action
-            android:id="@+id/action_to_chat"
+            android:id="@+id/actionToChat"
             app:destination="@id/chatFragment">
             <argument
                 android:name="userId"
@@ -107,5 +107,18 @@
         <argument
             android:name="userAvatarId"
             app:argType="integer" />
+    </fragment>
+
+    <fragment
+        android:id="@+id/usersFragment"
+        android:name="com.project.wave.ui.UsersFragment"
+        android:label="Users">
+        <action
+            android:id="@+id/action_to_chat"
+            app:destination="@id/chatFragment">
+            <argument
+                android:name="userId"
+                app:argType="string" />
+        </action>
     </fragment>
 </navigation> 

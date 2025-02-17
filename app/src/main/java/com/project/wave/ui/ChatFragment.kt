@@ -31,6 +31,7 @@ import com.project.wave.model.PermissionStatus
 import com.project.wave.model.User
 import com.project.wave.ui.adapter.ChatAdapter
 import java.util.UUID
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
 
 class ChatFragment : Fragment() {
     private var _binding: FragmentChatBinding? = null
@@ -44,9 +45,11 @@ class ChatFragment : Fragment() {
     private var otherUserId: String? = null
     private var otherUser: User? = null
     private var isFirstMessage = true
+    private var isAllowed = false
     private var permissionStatus: PermissionStatus = PermissionStatus.PENDING
-    private val initialMessages = listOf("Hi", "Hello", "I need your help")
+    private val initialMessages = listOf("Hi", "Hello", "I need your help!")
     private val STORAGE_PERMISSION_CODE = 1
+    private var isMessageAccepted = false
 
     private val filePickerLauncher = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult()
@@ -75,17 +78,158 @@ class ChatFragment : Fragment() {
         db = FirebaseFirestore.getInstance()
         storage = FirebaseStorage.getInstance()
         
-        // Get user ID from arguments
+        // Get user data from arguments
         otherUserId = args.userId
+        otherUser = User(
+            id = args.userId,
+            email = args.userEmail,
+            rollNumber = args.userRollNumber,
+            avatarId = args.userAvatarId
+        )
         
-        // Update toolbar with initial data
-        binding.toolbar.apply {
-            userEmail.text = args.userEmail
-            userRollNumber.text = args.userRollNumber
+        setupUI()
+        setupRecyclerView()
+        loadChatStatus()
+        loadMessages()
+    }
+
+    private fun setupUI() {
+        // Hide normal message input initially
+        binding.messageInputLayout.visibility = View.GONE
+        
+        // Show preset messages for sender if it's first message
+        val currentUserId = auth.currentUser?.uid
+        if (currentUserId != args.userId) {
+            binding.presetMessagesLayout.visibility = View.VISIBLE
+            binding.messageInputLayout.visibility = View.GONE
+            setupPresetMessages()
+        } else {
+            binding.presetMessagesLayout.visibility = View.GONE
+            showAcceptDialog()
+        }
+        
+        updateToolbarInfo()
+    }
+
+    private fun showAcceptDialog() {
+        MaterialAlertDialogBuilder(requireContext())
+            .setTitle("New Message Request")
+            .setMessage("Would you like to accept messages from this user?")
+            .setPositiveButton("Accept") { _, _ ->
+                acceptChat()
+            }
+            .setNegativeButton("Block") { _, _ ->
+                blockChat()
+            }
+            .setCancelable(false)
+            .show()
+    }
+
+    private fun acceptChat() {
+        val currentUserId = auth.currentUser?.uid ?: return
+        val chatId = getChatId(currentUserId, args.userId)
+        
+        db.collection("chats").document(chatId)
+            .update("status", "accepted")
+            .addOnSuccessListener {
+                isMessageAccepted = true
+                binding.messageInputLayout.visibility = View.VISIBLE
+                binding.presetMessagesLayout.visibility = View.GONE
+            }
+            .addOnFailureListener {
+                Toast.makeText(context, "Failed to accept chat", Toast.LENGTH_SHORT).show()
+            }
+    }
+
+    private fun blockChat() {
+        val currentUserId = auth.currentUser?.uid ?: return
+        val chatId = getChatId(currentUserId, args.userId)
+        
+        db.collection("chats").document(chatId)
+            .update("status", "blocked")
+            .addOnSuccessListener {
+                findNavController().navigateUp()
+            }
+    }
+
+    private fun loadChatStatus() {
+        val currentUserId = auth.currentUser?.uid ?: return
+        val chatId = getChatId(currentUserId, args.userId)
+        
+        db.collection("chats").document(chatId)
+            .get()
+            .addOnSuccessListener { document ->
+                isMessageAccepted = document.getString("status") == "accepted"
+                updateUIBasedOnStatus()
+            }
+    }
+
+    private fun updateUIBasedOnStatus() {
+        binding.apply {
+            if (isMessageAccepted) {
+                messageInputLayout.visibility = View.VISIBLE
+                presetMessagesLayout.visibility = View.GONE
+            } else {
+                val currentUserId = auth.currentUser?.uid
+                if (currentUserId != args.userId) {
+                    // Sender view
+                    messageInputLayout.visibility = View.GONE
+                    presetMessagesLayout.visibility = View.VISIBLE
+                }
+            }
+        }
+    }
+
+    private fun sendFirstMessage(message: String) {
+        val currentUserId = auth.currentUser?.uid ?: return
+        val chatId = getChatId(currentUserId, args.userId)
+        
+        // Create chat document first
+        db.collection("chats").document(chatId)
+            .set(mapOf(
+                "participants" to listOf(currentUserId, args.userId),
+                "status" to "pending",
+                "senderId" to currentUserId,
+                "receiverId" to args.userId,
+                "createdAt" to System.currentTimeMillis()
+            ))
+            .addOnSuccessListener {
+                // Then send the message
+                val message = Message(
+                    id = UUID.randomUUID().toString(),
+                    senderId = currentUserId,
+                    receiverId = args.userId,
+                    text = message,
+                    timestamp = System.currentTimeMillis(),
+                    type = MessageType.TEXT
+                )
+                
+                db.collection("chats")
+                    .document(chatId)
+                    .collection("messages")
+                    .add(message)
+                    .addOnSuccessListener {
+                        binding.presetMessagesLayout.visibility = View.GONE
+                        Toast.makeText(context, "Message sent", Toast.LENGTH_SHORT).show()
+                    }
+                    .addOnFailureListener { e ->
+                        Toast.makeText(context, "Failed to send message: ${e.message}", Toast.LENGTH_SHORT).show()
+                    }
+            }
+            .addOnFailureListener { e ->
+                Toast.makeText(context, "Failed to create chat: ${e.message}", Toast.LENGTH_SHORT).show()
+            }
+    }
+
+    private fun updateToolbarInfo() {
+        with(binding) {
+            // Set user info from arguments
+            userRollNumber.text = otherUser?.rollNumber
+            userEmail.text = otherUser?.email
             
             // Set avatar
             val avatarResId = resources.getIdentifier(
-                "avatar_${args.userAvatarId}",
+                "avatar_${otherUser?.avatarId ?: 1}",
                 "drawable",
                 requireContext().packageName
             )
@@ -96,88 +240,21 @@ class ChatFragment : Fragment() {
                 findNavController().navigateUp()
             }
         }
-        
-        // Setup RecyclerView
-        setupRecyclerView()
-        
-        // Load messages
-        loadMessages()
-        
-        // Setup message input
-        setupMessageInput()
-        
-        // Hide normal message input initially
-        binding.messageInputContainer.visibility = View.GONE
-        
-        // Setup preset messages
-        setupPresetMessages()
     }
 
-    private fun setupRecyclerView() {
-        adapter = ChatAdapter(
-            currentUserId = auth.currentUser?.uid ?: "",
-            onFileClick = { fileUrl ->
-                openFile(fileUrl)
+    private fun setupPresetMessages() {
+        binding.apply {
+            presetMessage1Button.setOnClickListener { 
+                sendFirstMessage("Hi")
             }
-        )
-        binding.messagesRecyclerView.apply {
-            layoutManager = LinearLayoutManager(context).apply {
-                stackFromEnd = true
+            
+            presetMessage2Button.setOnClickListener {
+                sendFirstMessage("Hello")
             }
-            adapter = this@ChatFragment.adapter
-        }
-    }
-
-    private fun setupMessageInput() {
-        binding.sendButton.setOnClickListener {
-            val messageText = binding.messageInput.text.toString().trim()
-            if (messageText.isNotEmpty()) {
-                sendMessage(messageText)
-                binding.messageInput.text?.clear()
+            
+            presetMessage3Button.setOnClickListener {
+                sendFirstMessage("I need your help!")
             }
-        }
-
-        binding.attachButton.setOnClickListener {
-            checkStoragePermission()
-        }
-    }
-
-    private fun loadMessages() {
-        val currentUserId = auth.currentUser?.uid ?: return
-        otherUserId?.let { recipientId ->
-            val chatId = getChatId(currentUserId, recipientId)
-            
-            db.collection("chats")
-                .document(chatId)
-                .collection("messages")
-                .orderBy("timestamp", Query.Direction.ASCENDING)
-                .addSnapshotListener { snapshot, _ ->
-                    snapshot?.let { documents ->
-                        val messages = documents.mapNotNull { it.toObject(Message::class.java) }
-                        adapter.submitList(messages)
-                        binding.messagesRecyclerView.scrollToPosition(messages.size - 1)
-                    }
-                }
-        }
-    }
-
-    private fun sendMessage(text: String) {
-        val currentUserId = auth.currentUser?.uid ?: return
-        otherUserId?.let { recipientId ->
-            val chatId = getChatId(currentUserId, recipientId)
-            
-            val message = Message(
-                senderId = currentUserId,
-                receiverId = recipientId,
-                text = text,
-                timestamp = System.currentTimeMillis(),
-                type = MessageType.TEXT
-            )
-            
-            db.collection("chats")
-                .document(chatId)
-                .collection("messages")
-                .add(message)
         }
     }
 
@@ -251,189 +328,81 @@ class ChatFragment : Fragment() {
         startActivity(intent)
     }
 
-    private fun getChatId(userId1: String, userId2: String): String {
-        return if (userId1 < userId2) "${userId1}_${userId2}" else "${userId2}_${userId1}"
-    }
-
-    private fun loadOtherUserData() {
-        otherUserId?.let { uid ->
-            db.collection("users").document(uid).get()
-                .addOnSuccessListener { document ->
-                    otherUser = document.toObject(User::class.java)
-                    updateToolbarInfo()
-                }
-        }
-    }
-
-    private fun updateToolbarInfo() {
-        binding.toolbar.apply {
-            userEmail.text = otherUser?.email
-            userRollNumber.text = otherUser?.rollNumber
-            
-            // Set avatar
-            val avatarResId = resources.getIdentifier(
-                "avatar_${otherUser?.avatarId ?: 1}",
-                "drawable",
-                requireContext().packageName
-            )
-            userAvatar.setImageResource(avatarResId)
-        }
-    }
-
-    private fun setupPresetMessages() {
-        binding.presetMessagesContainer.visibility = View.VISIBLE
-        binding.messageInputContainer.visibility = View.GONE
-        binding.permissionDialog.visibility = View.GONE
-        
-        initialMessages.forEachIndexed { index, message ->
-            when (index) {
-                0 -> binding.presetMessage1.apply {
-                    text = message
-                    setOnClickListener { 
-                        sendFirstMessage(message)
-                    }
-                }
-                1 -> binding.presetMessage2.apply {
-                    text = message
-                    setOnClickListener { 
-                        sendFirstMessage(message)
-                    }
-                }
-                2 -> binding.presetMessage3.apply {
-                    text = message
-                    setOnClickListener { 
-                        sendFirstMessage(message)
-                    }
-                }
-            }
-        }
-    }
-
-    private fun sendFirstMessage(messageText: String) {
+    private fun sendMessage(text: String) {
         val currentUserId = auth.currentUser?.uid ?: return
         otherUserId?.let { recipientId ->
             val chatId = getChatId(currentUserId, recipientId)
             
             val message = Message(
+                id = UUID.randomUUID().toString(),
                 senderId = currentUserId,
                 receiverId = recipientId,
-                text = messageText,
+                text = text,
                 timestamp = System.currentTimeMillis(),
                 type = MessageType.TEXT,
-                isFirstMessage = true
+                allowed = isAllowed
             )
             
-            // Create chat permission document
-            val permission = ChatPermission(
-                senderId = currentUserId,
-                receiverId = recipientId,
-                status = PermissionStatus.PENDING
-            )
-            
-            db.collection("chatPermissions")
-                .document("${recipientId}_${currentUserId}") // Note: receiver_sender format
-                .set(permission)
-                .addOnSuccessListener {
-                    // After setting permission, send the message
                     db.collection("chats")
                         .document(chatId)
                         .collection("messages")
                         .add(message)
                         .addOnSuccessListener {
-                            // Disable preset messages after sending first message
-                            binding.presetMessagesContainer.visibility = View.GONE
-                            Toast.makeText(context, "Message sent! Waiting for receiver's permission", Toast.LENGTH_LONG).show()
-                            // Navigate back to home
-                            findNavController().navigateUp()
-                        }
+                    // Clear input after sending
+                    binding.messageInput.setText("")
                 }
         }
     }
 
-    private fun checkChatPermission() {
+    private fun getChatId(userId1: String, userId2: String): String {
+        return if (userId1 < userId2) "${userId1}_${userId2}" else "${userId2}_${userId1}"
+    }
+
+    private fun loadMessages() {
         val currentUserId = auth.currentUser?.uid ?: return
-        otherUserId?.let { uid ->
-            db.collection("chatPermissions")
-                .document("${currentUserId}_${uid}") // Note: receiver_sender format
-                .get()
-                .addOnSuccessListener { document ->
-                    val permission = document.toObject(ChatPermission::class.java)
-                    when (permission?.status) {
-                        PermissionStatus.ALLOWED -> {
-                            binding.permissionDialog.visibility = View.GONE
-                            binding.messageInputContainer.visibility = View.VISIBLE
-                            binding.presetMessagesContainer.visibility = View.GONE
-                        }
-                        PermissionStatus.BLOCKED -> {
-                            showBlockedMessage()
-                        }
-                        PermissionStatus.PENDING -> {
-                            if (currentUserId == permission.receiverId) {
-                                // Show permission dialog to receiver
-                                binding.permissionDialog.visibility = View.VISIBLE
-                                binding.messageInputContainer.visibility = View.GONE
-                                binding.presetMessagesContainer.visibility = View.GONE
-                            } else {
-                                // Show waiting message to sender
-                                Toast.makeText(context, "Waiting for receiver's permission", Toast.LENGTH_SHORT).show()
-                                findNavController().navigateUp()
-                            }
-                        }
-                        null -> {
-                            // No permission record exists
-                            binding.presetMessagesContainer.visibility = View.VISIBLE
-                            binding.messageInputContainer.visibility = View.GONE
-                            binding.permissionDialog.visibility = View.GONE
-                        }
+        otherUserId?.let { recipientId ->
+            val chatId = getChatId(currentUserId, recipientId)
+            
+            // Listen for real-time updates
+            db.collection("chats")
+                .document(chatId)
+                .collection("messages")
+                .orderBy("timestamp", Query.Direction.ASCENDING)
+                .addSnapshotListener { snapshot, error ->
+                    if (error != null) {
+                        Toast.makeText(context, "Error loading messages", Toast.LENGTH_SHORT).show()
+                        return@addSnapshotListener
+                    }
+
+                    val messages = snapshot?.documents?.mapNotNull { doc ->
+                        doc.toObject(Message::class.java)
+                    } ?: emptyList()
+
+                    adapter.submitList(messages)
+                    
+                    // Scroll to bottom when new message arrives
+                    if (messages.isNotEmpty()) {
+                        binding.messagesRecyclerView.scrollToPosition(messages.size - 1)
                     }
                 }
         }
     }
 
-    private fun showMessageInput() {
-        binding.messageInputContainer.visibility = View.VISIBLE
-        binding.presetMessagesContainer.visibility = View.GONE
-        binding.permissionDialog.visibility = View.GONE
-    }
-
-    private fun showBlockedMessage() {
-        Toast.makeText(context, "You cannot send messages to this user", Toast.LENGTH_SHORT).show()
-        findNavController().navigateUp()
-    }
-
-    private fun showPermissionDialog() {
-        binding.permissionDialog.visibility = View.VISIBLE
-        
-        binding.allowButton.setOnClickListener {
-            updatePermissionStatus(PermissionStatus.ALLOWED)
-            binding.permissionDialog.visibility = View.GONE
-            showMessageInput()
-        }
-        
-        binding.blockButton.setOnClickListener {
-            updatePermissionStatus(PermissionStatus.BLOCKED)
-            findNavController().navigateUp()
-        }
-    }
-
-    private fun updatePermissionStatus(status: PermissionStatus) {
+    private fun setupRecyclerView() {
         val currentUserId = auth.currentUser?.uid ?: return
-        otherUserId?.let { uid ->
-            db.collection("chatPermissions")
-                .document("${currentUserId}_${uid}")
-                .update("status", status)
-                .addOnSuccessListener {
-                    when (status) {
-                        PermissionStatus.ALLOWED -> {
-                            binding.permissionDialog.visibility = View.GONE
-                            binding.messageInputContainer.visibility = View.VISIBLE
-                        }
-                        PermissionStatus.BLOCKED -> {
-                            showBlockedMessage()
-                        }
-                        else -> {}
-                    }
-                }
+        
+        adapter = ChatAdapter(
+            currentUserId = currentUserId,
+            onFileClick = { fileUrl ->
+                // Handle file click if needed
+            }
+        )
+
+        binding.messagesRecyclerView.apply {
+            layoutManager = LinearLayoutManager(context).apply {
+                stackFromEnd = true  // Messages stack from bottom
+            }
+            adapter = this@ChatFragment.adapter
         }
     }
 

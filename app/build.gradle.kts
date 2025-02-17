@@ -1,6 +1,6 @@
 plugins {
-    alias(libs.plugins.android.application)
-    alias(libs.plugins.jetbrains.kotlin.android)
+    id("com.android.application")
+    id("org.jetbrains.kotlin.android")
     id("com.google.gms.google-services")
     id("androidx.navigation.safeargs.kotlin")
 }
@@ -39,12 +39,11 @@ android {
 
     kotlinOptions {
         jvmTarget = "17"
-        freeCompilerArgs += listOf("-Xjvm-default=all")
     }
 }
 
 dependencies {
-    implementation(platform("com.google.firebase:firebase-bom:32.7.0"))
+    implementation(platform(libs.firebase.bom))
     
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.appcompat)
@@ -52,15 +51,15 @@ dependencies {
     implementation(libs.androidx.constraintlayout)
     implementation(libs.androidx.navigation.fragment.ktx)
     implementation(libs.androidx.navigation.ui.ktx)
+    implementation(libs.androidx.recyclerview)
+    implementation(libs.androidx.swiperefreshlayout)
     
     implementation(libs.firebase.auth)
     implementation(libs.firebase.firestore)
     implementation(libs.firebase.storage)
     
     implementation(libs.circleimageview)
-    implementation(libs.androidx.recyclerview)
-    implementation(libs.androidx.swiperefreshlayout)
-
+    
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.test.ext.junit)
     androidTestImplementation(libs.androidx.test.espresso.core)

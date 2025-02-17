@@ -39,13 +39,17 @@ class UserAdapter(
         }
 
         fun bind(user: User) {
-            binding.emailText.text = user.email
-            val avatarResId = binding.root.resources.getIdentifier(
-                "avatar_${user.avatarId}",
-                "drawable",
-                binding.root.context.packageName
-            )
-            binding.avatarImage.setImageResource(avatarResId)
+            binding.apply {
+                userEmail.text = user.email
+                userRollNumber.text = user.rollNumber
+                
+                val avatarResId = root.resources.getIdentifier(
+                    "avatar_${user.avatarId}",
+                    "drawable",
+                    root.context.packageName
+                )
+                userAvatar.setImageResource(avatarResId)
+            }
         }
     }
 

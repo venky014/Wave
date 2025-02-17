@@ -2,21 +2,50 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Helper functions
-    function isSignedIn() {
+    // Helper function to check if user is authenticated
+    function isAuthenticated() {
       return request.auth != null;
     }
     
-    function isOwner(userId) {
-      return isSignedIn() && request.auth.uid == userId;
+    // Helper function to check if user is involved in the chat
+    function isInvolvedInChat(chatId) {
+      let participants = chatId.split('_');
+      return isAuthenticated() && 
+        (request.auth.uid == participants[0] || request.auth.uid == participants[1]);
     }
-
+    
+    // Helper function to check if message is allowed
+    function isMessageAllowed(chatId) {
+      let chat = get(/databases/$(database)/documents/chats/$(chatId)).data;
+      return chat.status == 'accepted' || 
+             (chat.status == 'pending' && chat.senderId == request.auth.uid);
+    }
+    
+    // Chat documents
+    match /chats/{chatId} {
+      allow read: if isInvolvedInChat(chatId);
+      allow create: if isAuthenticated() && 
+        request.resource.data.senderId == request.auth.uid &&
+        request.resource.data.status == 'pending';
+      allow update: if isAuthenticated() && 
+        (resource.data.receiverId == request.auth.uid) &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status']);
+      allow delete: if false;
+    }
+    
+    // Chat messages
+    match /chats/{chatId}/messages/{messageId} {
+      allow read: if isInvolvedInChat(chatId);
+      allow create: if isAuthenticated() && 
+        request.resource.data.senderId == request.auth.uid &&
+        isMessageAllowed(chatId);
+      allow update, delete: if false;
+    }
+    
     // User profiles
     match /users/{userId} {
-      allow read: if isSignedIn();
-      allow create: if isSignedIn() && request.auth.uid == userId;
-      allow update: if isOwner(userId);
-      allow delete: if isOwner(userId);
+      allow read: if isAuthenticated();
+      allow write: if request.auth.uid == userId;
     }
 
     // Chat rooms
@@ -33,16 +62,6 @@ service cloud.firestore {
           request.auth.uid == userId || 
           exists(/databases/$(database)/documents/chats/$(chatId)/participants/$(request.auth.uid))
         );
-      }
-      
-      // Messages subcollection
-      match /messages/{messageId} {
-        allow read: if isSignedIn() && 
-          exists(/databases/$(database)/documents/chats/$(chatId)/participants/$(request.auth.uid));
-        allow create: if isSignedIn() && 
-          exists(/databases/$(database)/documents/chats/$(chatId)/participants/$(request.auth.uid)) &&
-          request.resource.data.senderId == request.auth.uid;
-        allow update, delete: if false; // Messages cannot be modified or deleted
       }
     }
   }

@@ -9,6 +9,7 @@ data class Message(
     val type: MessageType = MessageType.TEXT,
     val fileUrl: String? = null,
     val fileName: String? = null,
+    val allowed: Boolean = false,
     val isFirstMessage: Boolean = false
 )
 

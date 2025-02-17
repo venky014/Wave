@@ -1,12 +1,62 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical">
 
-    <include
+    <!-- Toolbar with user info -->
+    <com.google.android.material.appbar.MaterialToolbar
         android:id="@+id/toolbar"
-        layout="@layout/layout_chat_toolbar" />
+        android:layout_width="match_parent"
+        android:layout_height="?attr/actionBarSize"
+        android:background="?attr/colorPrimary"
+        android:theme="@style/ThemeOverlay.MaterialComponents.Dark.ActionBar">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:orientation="horizontal"
+            android:gravity="center_vertical">
+
+            <ImageButton
+                android:id="@+id/backButton"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:src="@drawable/ic_arrow_back"
+                android:padding="8dp"
+                android:tint="@android:color/white"/>
+
+            <de.hdodenhof.circleimageview.CircleImageView
+                android:id="@+id/userAvatar"
+                android:layout_width="40dp"
+                android:layout_height="40dp"
+                android:layout_marginStart="8dp"/>
+
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:layout_marginStart="8dp">
+
+                <TextView
+                    android:id="@+id/userRollNumber"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:textColor="@android:color/white"
+                    android:textSize="16sp"
+                    android:textStyle="bold"/>
+
+                <TextView
+                    android:id="@+id/userEmail"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:textColor="@android:color/white"
+                    android:textSize="14sp"/>
+            </LinearLayout>
+        </LinearLayout>
+    </com.google.android.material.appbar.MaterialToolbar>
 
     <androidx.recyclerview.widget.RecyclerView
         android:id="@+id/messagesRecyclerView"
@@ -14,35 +64,42 @@
         android:layout_height="0dp"
         android:layout_weight="1"
         android:clipToPadding="false"
-        android:padding="8dp" />
+        android:padding="8dp"/>
 
+    <!-- Preset Messages Layout -->
     <LinearLayout
-        android:id="@+id/presetMessagesContainer"
+        android:id="@+id/presetMessagesLayout"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="vertical"
-        android:padding="16dp">
+        android:padding="16dp"
+        android:visibility="gone">
 
-        <Button
-            android:id="@+id/presetMessage1"
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/presetMessage1Button"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginBottom="8dp" />
+            android:text="Hi"
+            android:layout_marginBottom="8dp"/>
 
-        <Button
-            android:id="@+id/presetMessage2"
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/presetMessage2Button"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginBottom="8dp" />
+            android:text="Hello"
+            android:layout_marginBottom="8dp"/>
 
-        <Button
-            android:id="@+id/presetMessage3"
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/presetMessage3Button"
             android:layout_width="match_parent"
-            android:layout_height="wrap_content" />
+            android:layout_height="wrap_content"
+            android:text="I need your help!"/>
+
     </LinearLayout>
 
+    <!-- Normal Message Input -->
     <LinearLayout
-        android:id="@+id/messageInputContainer"
+        android:id="@+id/messageInputLayout"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="horizontal"
@@ -54,67 +111,15 @@
             android:layout_height="wrap_content"
             android:layout_weight="1"
             android:hint="Type a message"
-            android:maxLines="4"
-            android:padding="12dp" />
-
-        <ImageButton
-            android:id="@+id/attachButton"
-            android:layout_width="48dp"
-            android:layout_height="48dp"
-            android:layout_marginStart="8dp"
-            android:background="?attr/selectableItemBackgroundBorderless"
-            android:src="@drawable/ic_attach" />
+            android:padding="12dp"
+            android:background="@android:color/transparent"/>
 
         <ImageButton
             android:id="@+id/sendButton"
             android:layout_width="48dp"
             android:layout_height="48dp"
-            android:layout_marginStart="8dp"
             android:background="?attr/selectableItemBackgroundBorderless"
-            android:src="@drawable/ic_send" />
+            android:src="@drawable/ic_send"/>
     </LinearLayout>
 
-    <FrameLayout
-        android:id="@+id/permissionDialog"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:padding="16dp"
-        android:visibility="gone">
-
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="vertical">
-
-            <TextView
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="Allow this user to send you messages?"
-                android:textAlignment="center"
-                android:textSize="16sp" />
-
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="16dp"
-                android:orientation="horizontal">
-
-                <Button
-                    android:id="@+id/allowButton"
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_marginEnd="8dp"
-                    android:layout_weight="1"
-                    android:text="Allow" />
-
-                <Button
-                    android:id="@+id/blockButton"
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_marginStart="8dp"
-                    android:layout_weight="1"
-                    android:text="Block" />
-            </LinearLayout>
-        </LinearLayout>
-    </FrameLayout>
 </LinearLayout> 
