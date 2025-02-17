@@ -222,7 +222,8 @@ class ChatFragment : Fragment() {
             "senderId" to currentUserId,
             "text" to message,
             "timestamp" to System.currentTimeMillis(),
-            "type" to MessageType.TEXT.name
+            "type" to MessageType.TEXT.name,
+            "read" to false
         )
 
         db.collection("chats")
@@ -238,11 +239,12 @@ class ChatFragment : Fragment() {
             }
     }
 
-    private fun updateLastMessage(chatId: String, lastMessage: String) {
-        db.collection("chats").document(chatId)
+    private fun updateLastMessage(chatId: String, message: String) {
+        db.collection("chats")
+            .document(chatId)
             .update(
                 mapOf(
-                    "lastMessage" to lastMessage,
+                    "lastMessage" to message,
                     "timestamp" to System.currentTimeMillis()
                 )
             )

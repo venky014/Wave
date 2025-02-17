@@ -11,6 +11,7 @@ import androidx.recyclerview.widget.DividerItemDecoration
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.Query
 import com.project.wave.R
 import com.project.wave.databinding.FragmentHomeBinding
 import com.project.wave.model.ChatItem
@@ -114,6 +115,11 @@ class HomeFragment : Fragment() {
                     return@addSnapshotListener
                 }
 
+                if (snapshots?.isEmpty == true) {
+                    updateVisibility(emptyList())
+                    return@addSnapshotListener
+                }
+
                 val chatItems = mutableListOf<ChatItem>()
                 
                 snapshots?.documents?.forEach { doc ->
@@ -121,23 +127,29 @@ class HomeFragment : Fragment() {
                         val otherUserId = (doc.get("participants") as? List<String>)?.find { it != currentUserId }
                         
                         if (otherUserId != null) {
+                            // Create ChatItem with basic info first
+                            val chatItem = ChatItem(
+                                id = doc.id,
+                                lastMessage = doc.getString("lastMessage") ?: "",
+                                timestamp = doc.getLong("timestamp") ?: 0,
+                                participants = doc.get("participants") as? List<String> ?: listOf(),
+                                status = doc.getString("status") ?: "pending",
+                                senderId = doc.getString("senderId") ?: "",
+                                receiverId = doc.getString("receiverId") ?: ""
+                            )
+                            
                             // Get other user's details
-                            db.collection("users").document(otherUserId).get()
+                            db.collection("users")
+                                .document(otherUserId)
+                                .get()
                                 .addOnSuccessListener { userDoc ->
-                                    val chatItem = ChatItem(
-                                        id = doc.id,
-                                        lastMessage = doc.getString("lastMessage") ?: "",
-                                        timestamp = doc.getLong("timestamp") ?: 0,
-                                        participants = doc.get("participants") as? List<String> ?: listOf(),
-                                        status = doc.getString("status") ?: "pending",
-                                        senderId = doc.getString("senderId") ?: "",
-                                        receiverId = doc.getString("receiverId") ?: "",
+                                    val updatedChatItem = chatItem.copy(
                                         otherUserRollNumber = userDoc.getString("rollNumber"),
                                         otherUserAvatarId = userDoc.getLong("avatarId")?.toInt() ?: 1
                                     )
-                                    chatItems.add(chatItem)
+                                    chatItems.add(updatedChatItem)
                                     
-                                    // Sort and update the list
+                                    // Update the list
                                     val sortedItems = chatItems.sortedByDescending { it.timestamp }
                                     chatAdapter.submitList(sortedItems)
                                     updateVisibility(sortedItems)
